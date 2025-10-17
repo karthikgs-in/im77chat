@@ -9,3 +9,6 @@ numpy
 streamlit
 # Pin protobuf to a version compatible with generated protos used by Streamlit and some deps
 protobuf==3.20.3
+# Local imghdr shim package to ensure the imghdr module is available during
+# dependency checks in hosted runtimes.
+-e local_packages/imghdr_pkg
