@@ -1,13 +1,12 @@
-import os, json, numpy as np
+import os
+import json
 import sys
-from pdf2image import convert_from_path
-from PIL import Image
-import cv2, pytesseract
-from pytesseract import Output
-from sentence_transformers import SentenceTransformer
-import faiss
 import google.generativeai as genai
 import google.api_core.exceptions as gexc
+# Heavy ML / native deps (numpy, pdf2image, cv2, pytesseract, sentence-transformers, faiss)
+# are imported lazily inside the functions that need them so this module can be
+# imported in lightweight deployment environments that don't install those
+# packages. Do not add top-level imports for them here.
 
 # ======= CONFIG =======
 PDF_PATH = "/Users/karthikgshanm/Documents/im77chat/data/im77-intro.pdf"
@@ -18,9 +17,9 @@ CHUNK_SIZE = 800
 TOP_K = 3
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not API_KEY:
-    print("ERROR: environment variable GOOGLE_API_KEY is not set.\nSet it with: export GOOGLE_API_KEY=your_key and retry.")
-    sys.exit(1)
-genai.configure(api_key=API_KEY)
+    # Do not exit at import time in hosted runtimes; defer to callers of ask_gemini().
+    print("WARNING: GOOGLE_API_KEY not set. Gemini calls will fail until it is provided.")
+
 
 # Check native binaries used by the pipeline
 def _which(cmd):
@@ -42,6 +41,12 @@ if missing_bins:
 os.makedirs(f"{OUT_DIR}/index", exist_ok=True)
 
 def preprocess_and_ocr(pdf_path):
+    # Lazy imports for deployment-safe module import
+    from pdf2image import convert_from_path
+    import numpy as np
+    import cv2
+    import pytesseract
+
     pages = convert_from_path(pdf_path, dpi=DPI)
     all_pages = []
     for i, page in enumerate(pages, 1):
@@ -54,6 +59,11 @@ def preprocess_and_ocr(pdf_path):
     return all_pages
 
 def build_index(pages):
+    # Lazy import heavy ML libs
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    import faiss
+
     model = SentenceTransformer(EMB_MODEL)
     texts, meta = [], []
     for p in pages:
@@ -75,6 +85,11 @@ def build_index(pages):
     print("Index built:", len(texts), "chunks")
 
 def load_index():
+    # Lazy imports for safe module import
+    import numpy as np
+    import faiss
+    from sentence_transformers import SentenceTransformer
+
     idx = faiss.read_index(f"{OUT_DIR}/index/faiss.index")
     embs = np.load(f"{OUT_DIR}/index/embs.npy")
     with open(f"{OUT_DIR}/index/meta.json") as f: meta = json.load(f)
@@ -83,6 +98,7 @@ def load_index():
     return idx, model, texts, meta
 
 def retrieve(query, idx, model, texts, meta, k=TOP_K):
+    # This function assumes idx and model are valid objects (loaded from load_index).
     q_emb = model.encode([query])
     D, I = idx.search(q_emb, k)
     return [{"page": meta[i]["page"], "text": texts[i]} for i in I[0]]
