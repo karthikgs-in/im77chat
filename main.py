@@ -1,8 +1,12 @@
 import os
 import json
 import sys
-import google.generativeai as genai
-import google.api_core.exceptions as gexc
+# Note: do not import google.generativeai at module import time; import lazily
+# inside ask_gemini() so the module can be imported on hosts that don't have the
+# google client packages installed (some hosted runtimes may omit parts of the
+# stdlib or certain packages which can cause import-time failures).
+genai = None
+gexc = None
 # Heavy ML / native deps (numpy, pdf2image, cv2, pytesseract, sentence-transformers, faiss)
 # are imported lazily inside the functions that need them so this module can be
 # imported in lightweight deployment environments that don't install those
@@ -105,6 +109,7 @@ def retrieve(query, idx, model, texts, meta, k=TOP_K):
 
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
 
+
 def ask_gemini(context, question):
     """Call Gemini (configurable via GEMINI_MODEL). On failure, return a helpful fallback string.
 
@@ -112,12 +117,30 @@ def ask_gemini(context, question):
     catches the error and returns a diagnostic message that includes a short context excerpt.
     """
     prompt = f"Answer based only on the text below and cite pages.\n\nContext:\n{context}\n\nQuestion:\n{question}"
+    # Lazy import of google generative client and exceptions so module import
+    # doesn't fail in environments where those packages aren't available.
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
+        import google.generativeai as _genai
+        import google.api_core.exceptions as _gexc
+    except Exception as e:
+        # If importing the client fails, return a graceful fallback instead of
+        # letting the whole app crash during import.
+        print(f"GENAI IMPORT FAILED: {e}")
+        return f"[GENAI UNAVAILABLE - import failed] {e}\nFALLBACK: {context[:1000]}"
+
+    # Configure with API key if present
+    if API_KEY:
+        try:
+            _genai.configure(api_key=API_KEY)
+        except Exception:
+            # Non-fatal; configuration may happen in the client call below
+            pass
+
+    try:
+        model = _genai.GenerativeModel(GEMINI_MODEL)
         resp = model.generate_content(prompt)
-        # Some client implementations return an object with .text
         return getattr(resp, "text", str(resp))
-    except gexc.NotFound as e:
+    except _gexc.NotFound as e:
         msg = (
             f"GENAI MODEL NOT FOUND: {GEMINI_MODEL}.\n"
             "Check available models (ListModels) or set GEMINI_MODEL to a supported model name.\n"
