@@ -1,0 +1,9 @@
+pdf2image
+pytesseract
+pillow
+opencv-python-headless
+sentence-transformers
+faiss-cpu
+google-generativeai
+numpy
+streamlit
