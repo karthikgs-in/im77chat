@@ -7,3 +7,5 @@ faiss-cpu
 google-generativeai
 numpy
 streamlit
+# Pin protobuf to a version compatible with generated protos used by Streamlit and some deps
+protobuf==3.20.3
