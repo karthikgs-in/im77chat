@@ -1,12 +1,11 @@
+# Runtime requirements (keep minimal for Cloud deployment).
 pdf2image
 pytesseract
 pillow
 opencv-python-headless
-sentence-transformers
-faiss-cpu
 google-generativeai
-numpy
 streamlit
+# Pin protobuf to a version compatible with generated protos used by Streamlit and some deps
 # Pin protobuf to a version compatible with generated protos used by Streamlit and some deps
 protobuf==3.20.3
 # Local imghdr shim package to ensure the imghdr module is available during
